@@ -336,9 +336,8 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (currentUser?.displayName) {
-        setStudentName(currentUser.displayName);
-      }
+      // Google/Firebase user ở đây chỉ phục vụ kết nối Drive.
+      // Không ghi đè tên tài khoản học tập đang đăng nhập trong ứng dụng.
       const token = getCachedToken();
       if (token) setAccessToken(token);
     });
