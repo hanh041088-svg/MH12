@@ -22,7 +22,7 @@ export const AIChatbot: React.FC = () => {
     {
       id: "welcome",
       role: "model",
-      text: "Xin chào bạn! Thầy/Cô là Trợ lý Gia sư AI môn Tin học 12 (bộ sách Kết nối tri thức). Bạn đang gặp khó khăn hay cần giải đáp khái niệm nào trong chương trình (Mạng máy tính, HTML/CSS, AI, An toàn thông tin, v.v.), hãy hỏi ngay nhé!",
+      text: "Xin chào em! Cô là trợ lý Gia sư AI môn Tin học.",
       timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
@@ -122,7 +122,7 @@ export const AIChatbot: React.FC = () => {
               {
                 id: "welcome",
                 role: "model",
-                text: "Xin chào bạn! Tôi là Gia sư AI Tin học 12. Hãy đặt bất kỳ câu hỏi nào về các bài học trong SGK nhé!",
+                text: "Xin chào em! Cô là trợ lý Gia sư AI môn Tin học.",
                 timestamp: new Date().toLocaleTimeString("vi-VN", {
                   hour: "2-digit",
                   minute: "2-digit",
