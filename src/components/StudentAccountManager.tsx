@@ -26,6 +26,7 @@ import {
   batchCreateStudents,
   resetStudentPassword,
   deleteStudentAccount,
+  syncStudentAccountsToFirebase,
   ALL_CLASSES,
 } from "../services/accountService";
 import { StudentAccount } from "../types";
@@ -76,6 +77,16 @@ export const StudentAccountManager: React.FC<StudentAccountManagerProps> = ({
     setTimeout(() => setNotification(null), 4000);
   };
 
+  useEffect(() => {
+    if (sessionStorage.getItem("tinhoc12_firebase_accounts_synced") === "1") return;
+    syncStudentAccountsToFirebase()
+      .then(({ synced }) => {
+        sessionStorage.setItem("tinhoc12_firebase_accounts_synced", "1");
+        if (synced > 0) showToast(`Đã đồng bộ ${synced} tài khoản học sinh lên hệ thống dùng chung.`);
+      })
+      .catch((error) => showToast(error?.message || "Không thể đồng bộ tài khoản dùng chung.", "error"));
+  }, []);
+
   // Toggle password visibility
   const toggleShowPassword = (id: string) => {
     setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -121,7 +132,7 @@ export const StudentAccountManager: React.FC<StudentAccountManagerProps> = ({
   };
 
   // Submit Single Form
-  const handleSingleSubmit = (e: React.FormEvent) => {
+  const handleSingleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSingleError(null);
     if (!singleName.trim() || !singleCode.trim()) {
@@ -129,7 +140,7 @@ export const StudentAccountManager: React.FC<StudentAccountManagerProps> = ({
       return;
     }
 
-    const res = addStudentAccount({
+    const res = await addStudentAccount({
       name: singleName,
       className: singleClass,
       studentCode: singleCode,
@@ -150,18 +161,22 @@ export const StudentAccountManager: React.FC<StudentAccountManagerProps> = ({
   };
 
   // Submit Batch Form
-  const handleBatchSubmit = (e: React.FormEvent) => {
+  const handleBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const created = batchCreateStudents({
-      className: batchClass,
-      count: Number(batchCount) || 10,
-      prefix: batchPrefix,
-      defaultPassword: batchPassword,
-    });
+    try {
+      const created = await batchCreateStudents({
+        className: batchClass,
+        count: Number(batchCount) || 10,
+        prefix: batchPrefix,
+        defaultPassword: batchPassword,
+      });
 
-    refreshAccounts();
-    setShowBatchModal(false);
-    showToast(`Đã cấp thành công ${created.length} tài khoản cho lớp ${batchClass}!`);
+      refreshAccounts();
+      setShowBatchModal(false);
+      showToast(`Đã cấp thành công ${created.length} tài khoản cho lớp ${batchClass}!`);
+    } catch (error: any) {
+      showToast(error?.message || "Không thể tạo tài khoản hàng loạt.", "error");
+    }
   };
 
   // Generate suggested student code when typing class
