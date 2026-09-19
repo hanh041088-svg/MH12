@@ -1,0 +1,6 @@
+{
+  "name": "Tin Học 12 - Luyện Thi & Quản Lý Điểm",
+  "description": "Nền tảng làm bài kiểm tra trắc nghiệm theo bài SGK Tin học 12, phân tích tiến độ, bảng điều khiển giáo viên, gia sư AI và lưu trữ báo cáo học tập.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
