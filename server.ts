@@ -294,7 +294,7 @@ app.post("/api/drive/save-report", async (req, res) => {
     }
 
     const accessToken = authHeader.split(" ")[1];
-    const { fileName, content, mimeType = "text/html" } = req.body;
+    const { fileName, content, contentBase64, mimeType = "text/html" } = req.body;
 
     const boundary = "-------314159265358979323846";
     const delimiter = "\r\n--" + boundary + "\r\n";
@@ -305,14 +305,20 @@ app.post("/api/drive/save-report", async (req, res) => {
       mimeType: mimeType,
     };
 
-    const multipartRequestBody =
-      delimiter +
-      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-      JSON.stringify(metadata) +
-      delimiter +
-      `Content-Type: ${mimeType}; charset=UTF-8\r\n\r\n` +
-      content +
-      closeDelim;
+    const fileContent = contentBase64
+      ? Buffer.from(contentBase64, "base64")
+      : Buffer.from(content || "", "utf8");
+    const multipartRequestBody = Buffer.concat([
+      Buffer.from(
+        delimiter +
+          "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+          JSON.stringify(metadata) +
+          delimiter +
+          `Content-Type: ${mimeType}\r\n\r\n`
+      ),
+      fileContent,
+      Buffer.from(closeDelim),
+    ]);
 
     const driveResponse = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
