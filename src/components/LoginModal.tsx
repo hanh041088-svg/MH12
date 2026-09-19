@@ -52,7 +52,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
@@ -66,7 +66,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       return;
     }
 
-    const res = loginUnified(loginIdentifier, password);
+    const res = await loginUnified(loginIdentifier, password);
     if (res.success && res.session) {
       if (res.session.role === "teacher") {
         const teacherAcc = res.session.account as TeacherAccount;
