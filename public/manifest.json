@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Tin Học 12 - Luyện Thi & Quản Lý Điểm",
+  "short_name": "Tin Học 12",
+  "description": "Nền tảng làm bài kiểm tra trắc nghiệm theo bài SGK Tin học 12, phân tích tiến độ và lưu trữ báo cáo học tập.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
