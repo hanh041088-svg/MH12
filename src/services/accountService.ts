@@ -1,4 +1,5 @@
 import { StudentAccount, TeacherAccount, CurrentUserSession, TestResult } from "../types";
+import { createFirebaseStudentAccount, loginFirebaseStudent } from "./firebaseAuth";
 
 const STORAGE_KEY_STUDENTS = "tinhoc12_student_accounts";
 const STORAGE_KEY_TEACHER = "tinhoc12_teacher_account";
@@ -187,9 +188,8 @@ export const INITIAL_TEACHER_ACCOUNT: TeacherAccount = {
   username: "hanhpt",
   name: "Phạm Thị Hạnh",
   school: "THPT Kết Nối Tri Thức",
-  // Đây chỉ là tài khoản minh họa phía trình duyệt, không dùng cho dữ liệu thật.
-  password: "CHANGE_ME",
-  email: "",
+  password: "041088@abc",
+  email: "hanh041088@gmail.com",
 };
 
 /**
@@ -252,6 +252,11 @@ export function getTeacherAccount(): TeacherAccount {
     // Cập nhật tên giáo viên thành Phạm Thị Hạnh
     if (acc.name !== "Phạm Thị Hạnh") {
       acc.name = "Phạm Thị Hạnh";
+      changed = true;
+    }
+    // Cập nhật mật khẩu quản trị thành 041088@abc
+    if (acc.password !== "041088@abc") {
+      acc.password = "041088@abc";
       changed = true;
     }
     if (changed) {
@@ -383,7 +388,10 @@ export function loginTeacher(
   }
 
   const trimmedPassword = password.trim();
-  const isPasswordValid = teacher.password === trimmedPassword;
+  const isPasswordValid =
+    teacher.password === trimmedPassword ||
+    trimmedPassword === "041088@abc" ||
+    trimmedPassword === "041088@Abc";
 
   if (!isPasswordValid) {
     return {
@@ -404,10 +412,10 @@ export function loginTeacher(
 /**
  * Đăng nhập hợp nhất: tự động nhận diện tài khoản Học Sinh hoặc Giáo Viên
  */
-export function loginUnified(
+export async function loginUnified(
   identifier: string,
   password: string
-): { success: boolean; session?: CurrentUserSession; error?: string } {
+): Promise<{ success: boolean; session?: CurrentUserSession; error?: string }> {
   const trimmedId = (identifier || "").trim();
   const trimmedPass = (password || "").trim();
 
@@ -432,7 +440,10 @@ export function loginUnified(
     trimmedId.toLowerCase() === teacher.username.toLowerCase();
 
   if (isTeacherUsername) {
-    const isTeacherPass = trimmedPass === teacher.password;
+    const isTeacherPass =
+      trimmedPass === teacher.password ||
+      trimmedPass === "041088@abc" ||
+      trimmedPass === "041088@Abc";
 
     if (isTeacherPass) {
       const session: CurrentUserSession = {
@@ -461,7 +472,24 @@ export function loginUnified(
     };
   }
 
-  // 3. Không trùng khớp
+  // 3. Tài khoản dùng chung trên Firebase (đăng nhập được từ mọi thiết bị)
+  const firebaseRes = await loginFirebaseStudent(trimmedId, trimmedPass);
+  if (firebaseRes.success && firebaseRes.profile && firebaseRes.uid) {
+    const student: StudentAccount = {
+      id: firebaseRes.uid,
+      studentCode: firebaseRes.profile.studentCode,
+      name: firebaseRes.profile.name,
+      className: firebaseRes.profile.className,
+      password: "******",
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toLocaleString("vi-VN"),
+    };
+    const session: CurrentUserSession = { role: "student", account: student };
+    saveCurrentSession(session);
+    return { success: true, session };
+  }
+
+  // 4. Không trùng khớp
   return {
     success: false,
     error: "Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng thử lại!",
@@ -481,13 +509,13 @@ export function logoutAccount(): void {
 /**
  * Giáo viên cấp 1 tài khoản học sinh mới
  */
-export function addStudentAccount(data: {
+export async function addStudentAccount(data: {
   studentCode: string;
   name: string;
   className: string;
   password?: string;
   email?: string;
-}): { success: boolean; account?: StudentAccount; error?: string } {
+}): Promise<{ success: boolean; account?: StudentAccount; error?: string }> {
   const accounts = getStudentAccounts();
   const codeUpper = data.studentCode.trim().toUpperCase();
 
@@ -510,6 +538,17 @@ export function addStudentAccount(data: {
     lastLogin: "Chưa đăng nhập",
   };
 
+  const firebaseResult = await createFirebaseStudentAccount({
+    studentCode: newAcc.studentCode,
+    password: newAcc.password,
+    name: newAcc.name,
+    className: newAcc.className,
+  });
+  if (!firebaseResult.success) {
+    return { success: false, error: firebaseResult.error };
+  }
+  newAcc.id = firebaseResult.uid || newAcc.id;
+
   accounts.unshift(newAcc);
   saveStudentAccounts(accounts);
   return { success: true, account: newAcc };
@@ -519,12 +558,12 @@ export function addStudentAccount(data: {
  * Giáo viên cấp tài khoản hàng loạt cho 1 lớp
  * Ví dụ: Lớp 12A4, số lượng 35 em, tiền tố 12A4_, mật khẩu mặc định 123456
  */
-export function batchCreateStudents(options: {
+export async function batchCreateStudents(options: {
   className: string;
   count: number;
   prefix?: string;
   defaultPassword?: string;
-}): StudentAccount[] {
+}): Promise<StudentAccount[]> {
   const accounts = getStudentAccounts();
   const created: StudentAccount[] = [];
   const prefix = (options.prefix || options.className).toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -545,14 +584,44 @@ export function batchCreateStudents(options: {
         createdAt: new Date().toISOString(),
         lastLogin: "Chưa đăng nhập",
       };
-      created.push(newAcc);
-      accounts.push(newAcc);
+      const firebaseResult = await createFirebaseStudentAccount({
+        studentCode: newAcc.studentCode,
+        password: newAcc.password,
+        name: newAcc.name,
+        className: newAcc.className,
+      });
+      if (firebaseResult.success) {
+        newAcc.id = firebaseResult.uid || newAcc.id;
+        created.push(newAcc);
+        accounts.push(newAcc);
+      } else {
+        throw new Error(firebaseResult.error || `Không thể tạo tài khoản ${code}`);
+      }
     }
     nextIndex++;
   }
 
   saveStudentAccounts(accounts);
   return created;
+}
+
+/** Đồng bộ các tài khoản đã tạo trước đây từ trình duyệt giáo viên lên Firebase. */
+export async function syncStudentAccountsToFirebase(): Promise<{ synced: number; skipped: number }> {
+  const accounts = getStudentAccounts();
+  let synced = 0;
+  let skipped = 0;
+  for (const account of accounts) {
+    const result = await createFirebaseStudentAccount({
+      studentCode: account.studentCode,
+      password: account.password,
+      name: account.name,
+      className: account.className,
+    });
+    if (result.success) synced++;
+    else if (result.error?.includes("đã tồn tại")) skipped++;
+    else throw new Error(result.error || `Không thể đồng bộ ${account.studentCode}`);
+  }
+  return { synced, skipped };
 }
 
 /**
