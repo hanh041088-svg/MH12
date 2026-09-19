@@ -1,3 +1,5 @@
+import * as XLSX from "xlsx";
+
 export interface DriveUploadResponse {
   success: boolean;
   fileId?: string;
@@ -8,7 +10,7 @@ export interface DriveUploadResponse {
 
 export async function uploadToDrive(
   fileName: string,
-  content: string,
+  content: string | Blob | ArrayBuffer,
   mimeType: string = "text/html",
   accessToken: string
 ): Promise<DriveUploadResponse> {
@@ -22,14 +24,23 @@ export async function uploadToDrive(
       mimeType: mimeType,
     };
 
-    const multipartRequestBody =
-      delimiter +
-      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-      JSON.stringify(metadata) +
-      delimiter +
-      `Content-Type: ${mimeType}; charset=UTF-8\r\n\r\n` +
-      content +
-      closeDelim;
+    const contentBlob =
+      content instanceof Blob
+        ? content
+        : new Blob([content], { type: mimeType });
+
+    const multipartRequestBody = new Blob(
+      [
+        delimiter,
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n",
+        JSON.stringify(metadata),
+        delimiter,
+        `Content-Type: ${mimeType}\r\n\r\n`,
+        contentBlob,
+        closeDelim,
+      ],
+      { type: `multipart/related; boundary=${boundary}` }
+    );
 
     const driveRes = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
@@ -56,6 +67,21 @@ export async function uploadToDrive(
     };
   } catch (err: any) {
     console.error("Direct drive upload error, fallback to server:", err);
+    const binaryContent =
+      content instanceof Blob
+        ? new Uint8Array(await content.arrayBuffer())
+        : content instanceof ArrayBuffer
+          ? new Uint8Array(content)
+          : null;
+    let contentBase64: string | undefined;
+    if (binaryContent) {
+      let binaryString = "";
+      const chunkSize = 0x8000;
+      for (let offset = 0; offset < binaryContent.length; offset += chunkSize) {
+        binaryString += String.fromCharCode(...binaryContent.subarray(offset, offset + chunkSize));
+      }
+      contentBase64 = btoa(binaryString);
+    }
     // Fallback through backend route
     const serverRes = await fetch("/api/drive/save-report", {
       method: "POST",
@@ -63,7 +89,12 @@ export async function uploadToDrive(
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ fileName, content, mimeType }),
+      body: JSON.stringify({
+        fileName,
+        content: typeof content === "string" ? content : undefined,
+        contentBase64,
+        mimeType,
+      }),
     });
     const serverData = await serverRes.json();
     if (!serverRes.ok) {
@@ -71,6 +102,72 @@ export async function uploadToDrive(
     }
     return serverData;
   }
+}
+
+export function generateGradebookWorkbook(
+  teacherName: string,
+  students: Array<{
+    name: string;
+    className: string;
+    testsCompleted: number;
+    averageScore: number;
+    highestScore: number;
+    weakTopics: string[];
+  }>
+): Blob {
+  const workbook = XLSX.utils.book_new();
+  const studentsByClass = students.reduce<Record<string, typeof students>>((groups, student) => {
+    const className = student.className?.trim() || "Chưa xếp lớp";
+    (groups[className] ||= []).push(student);
+    return groups;
+  }, {});
+
+  const classNames = Object.keys(studentsByClass).sort((a, b) =>
+    a.localeCompare(b, "vi", { numeric: true })
+  );
+
+  if (classNames.length === 0) classNames.push("Bảng điểm");
+
+  classNames.forEach((className) => {
+    const classStudents = studentsByClass[className] || [];
+    const rows: Array<Array<string | number>> = [
+      [`BẢNG ĐIỂM MÔN TIN HỌC 12 - LỚP ${className}`],
+      [`Giáo viên: ${teacherName || "Giáo viên bộ môn"}`, "", "", "", `Ngày xuất: ${new Date().toLocaleDateString("vi-VN")}`],
+      [],
+      ["STT", "Họ và tên học sinh", "Lớp", "Số bài đã làm", "Điểm trung bình", "Điểm cao nhất", "Chủ đề cần cải thiện"],
+      ...classStudents.map((student, index) => [
+        index + 1,
+        student.name,
+        student.className,
+        student.testsCompleted,
+        student.averageScore,
+        student.highestScore,
+        student.weakTopics.length > 0 ? student.weakTopics.join("; ") : "Nắm vững toàn diện",
+      ]),
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } },
+      { s: { r: 1, c: 4 }, e: { r: 1, c: 6 } },
+    ];
+    worksheet["!cols"] = [
+      { wch: 7 }, { wch: 28 }, { wch: 10 }, { wch: 16 },
+      { wch: 18 }, { wch: 16 }, { wch: 42 },
+    ];
+    worksheet["!autofilter"] = {
+      ref: `A4:G${Math.max(4, classStudents.length + 4)}`,
+    };
+
+    const safeSheetName = className.replace(/[\\/?*\[\]:]/g, "-").slice(0, 31) || "Bảng điểm";
+    XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
+  });
+
+  const workbookBytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  return new Blob([workbookBytes], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
 }
 
 // Generate an elegant HTML gradebook report for Google Drive
