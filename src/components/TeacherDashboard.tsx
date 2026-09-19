@@ -19,7 +19,7 @@ import {
   KeyRound,
   BarChart2,
 } from "lucide-react";
-import { uploadToDrive, generateGradebookHTML } from "../services/driveService";
+import { uploadToDrive, generateGradebookWorkbook } from "../services/driveService";
 import { StudentAccountManager } from "./StudentAccountManager";
 import { getStudentAccounts, ALL_CLASSES } from "../services/accountService";
 
@@ -95,10 +95,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       setIsExportingToDrive(true);
       setDriveError(null);
 
-      const html = generateGradebookHTML(teacherName || "Thầy Cô Bộ Môn", students);
-      const fileName = `BangDiem_TinHoc12_${new Date().toISOString().slice(0, 10)}.html`;
+      const workbook = generateGradebookWorkbook(teacherName || "Thầy Cô Bộ Môn", students);
+      const fileName = `BangDiem_TinHoc12_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
-      const res = await uploadToDrive(fileName, html, "text/html", accessToken);
+      const res = await uploadToDrive(fileName, workbook, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", accessToken);
       if (res.success && res.webViewLink) {
         setDriveExportLink(res.webViewLink);
       } else {
