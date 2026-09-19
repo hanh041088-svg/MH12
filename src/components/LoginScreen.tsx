@@ -32,7 +32,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSuccessMessage, setLoginSuccessMessage] = useState<string | null>(null);
 
-  const handleUnifiedSubmit = (e: React.FormEvent) => {
+  const handleUnifiedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
@@ -46,7 +46,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    const res = loginUnified(loginIdentifier, password);
+    const res = await loginUnified(loginIdentifier, password);
     if (res.success && res.session) {
       if (res.session.role === "teacher") {
         const teacherAcc = res.session.account as TeacherAccount;
