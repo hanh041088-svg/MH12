@@ -11,10 +11,12 @@ import {
   signOut,
 } from "firebase/auth";
 import firebaseConfig from "../../firebase-applet-config.json";
+import { getFirestore } from "firebase/firestore";
 
 // Initialize Firebase App safely (avoid duplicate init)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 const studentCreatorApp =
   getApps().find((firebaseApp) => firebaseApp.name === "student-account-creator") ||
   initializeApp(firebaseConfig, "student-account-creator");

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TeacherStudentSummary, StudentAccount } from "../types";
 import { INITIAL_STUDENTS_MOCK, ALL_LESSONS } from "../data/curriculumData";
 import {
@@ -22,6 +22,7 @@ import {
 import { uploadToDrive, generateGradebookWorkbook } from "../services/driveService";
 import { StudentAccountManager } from "./StudentAccountManager";
 import { getStudentAccounts, ALL_CLASSES } from "../services/accountService";
+import { subscribeStudentSummaries } from "../services/cloudResultsService";
 
 interface TeacherDashboardProps {
   accessToken: string | null;
@@ -48,6 +49,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [isExportingToDrive, setIsExportingToDrive] = useState<boolean>(false);
   const [driveExportLink, setDriveExportLink] = useState<string | null>(null);
   const [driveError, setDriveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStudentSummaries(
+      (cloudStudents) => {
+        if (cloudStudents.length > 0) setStudents(cloudStudents);
+      },
+      (error) => console.error("Không thể tải bảng điểm Firestore:", error)
+    );
+    return unsubscribe;
+  }, []);
 
   // Filter students
   const filteredStudents = students.filter((s) => {

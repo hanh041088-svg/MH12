@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
 import { auth, getCachedToken } from "./services/firebaseAuth";
+import { saveStudentResultToCloud } from "./services/cloudResultsService";
 import { Lesson, TestResult, CurrentUserSession, StudentAccount, TeacherAccount } from "./types";
 import { ALL_LESSONS } from "./data/curriculumData";
 import { Navbar } from "./components/Navbar";
@@ -364,6 +365,11 @@ export default function App() {
   // Handle finish test -> Tăng chuỗi ngày học streak 🔥 và lưu lịch sử làm bài
   const handleFinishTest = (result: TestResult) => {
     setTestHistory((prev) => [result, ...prev]);
+    if (currentSession?.role === "student" && currentSession.account) {
+      saveStudentResultToCloud(currentSession.account as StudentAccount, result).catch((error) =>
+        console.error("Không thể lưu kết quả lên Firestore:", error)
+      );
+    }
     // Ghi nhận chuỗi ngày học liên tiếp
     const updatedStreak = recordStudyActivity(
       currentSession?.role === "student" ? currentSession.account?.id : undefined
